@@ -8,7 +8,7 @@ class Graph:
         self.graphInfoList.append([2, 3, 5])
         self.graphInfoList.append([3, 2, 5, 6])
         self.graphInfoList.append([4, 1, 3, 5])
-        self.graphInfoList.append([5, 1, 2, 3])
+        self.graphInfoList.append([5, 1, 2, 3, 6])
         self.graphInfoList.append([6, 2])
 
         self.vertexNum = len(self.graphInfoList)

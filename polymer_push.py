@@ -1,5 +1,5 @@
 from graph import Graph
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
 class _Master:
@@ -7,6 +7,7 @@ class _Master:
         self.id = id
         self.agentLocationList = []
         self.outEdgeHeadIndex: int
+        self.outEdgeIndexDelta: int
         targetVertexList = graph.getTargetVertexList(id)
         for parID, lst in parIDVertexListMap.items():
             if parID == partitionID:
@@ -23,6 +24,7 @@ class _Agent:
         self.id = vertexID
         self.masterLocation = masterLocation
         self.outEdgeHeadIndex: int
+        self.outEdgeIndexDelta: int
 
 
 class _PolymerPushPartition:
@@ -69,28 +71,40 @@ class PolymerPush:
                     if targetVertex in partition.masterIDList:
                         partition.outEdgeList.append(targetVertex)
                         cursor += 1
-                master.outEdgeHeadIndex = headIndex
-                headIndex += cursor
+                if cursor == 0:
+                    master.outEdgeHeadIndex = None
+                    master.outEdgeIndexDelta = None
+                else:
+                    master.outEdgeHeadIndex = headIndex
+                    master.outEdgeIndexDelta = cursor
+                    headIndex += cursor
             for agent in partition.agentList:
                 cursor = 0
                 for targetVertex in graph.getTargetVertexList(agent.id):
                     if targetVertex in partition.masterIDList:
                         partition.outEdgeList.append(targetVertex)
                         cursor += 1
-                agent.outEdgeHeadIndex = headIndex
-                headIndex += cursor
+                if cursor == 0:
+                    agent.outEdgeHeadIndex = None
+                    agent.outEdgeIndexDelta = None
+                else:
+                    agent.outEdgeHeadIndex = headIndex
+                    agent.outEdgeIndexDelta = cursor
+                    headIndex += cursor
 
-    def verIDToLocIndex(self, partitionID, vertexID) -> int:
-        return self.partitionList[partitionID - 1].locationMapping[vertexID]
+    def verIDToLocation(self, vertexID) -> Tuple[int, int]:
+        length = self.partitionList[0].masterList.__len__()
+        partitionID = int(vertexID / length) + 1
+        localIndex = (vertexID - 1) % length
+        return (partitionID, localIndex)
 
 
 if __name__ == "__main__":
     polymerPush = PolymerPush(2)
     for partition in polymerPush.partitionList:
+        print(partition.outEdgeList)
         # print(index.id)
-        num = 0
-        for i in partition.agentList:
-            print("###" + str(num))
-            print(i.id)
-            print(i.masterLocation)
-            num += 1
+        for master in partition.masterList:
+            print(master.outEdgeHeadIndex)
+        for agent in partition.agentList:
+            print(agent.outEdgeHeadIndex)
