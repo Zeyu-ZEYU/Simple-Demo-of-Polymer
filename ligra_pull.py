@@ -133,7 +133,6 @@ def start(graph: Graph, outer, epsilon, maxIter):
             partition.statCurrList.append(True)
             partition.statNextList.append(True)
         ligraPull.stateLookUpTable[partition.id] = partition.statNextList
-    outer.AppendText("初始化结束\n")
     # 以上初始化结束
 
     # 开始进行计算
@@ -144,7 +143,6 @@ def start(graph: Graph, outer, epsilon, maxIter):
     iter = 0
     while iter < maxIter and not ligraPull.isAllStateFalse():
         # EdgeMap
-        outer.AppendText("一次循环的EdgeMap\n")
         for par in ligraPull.partitionList:
             for master in par.masterList:
                 if master.outEdgeHeadIndex is not None:
@@ -158,7 +156,7 @@ def start(graph: Graph, outer, epsilon, maxIter):
                             localIndex = ligraPull.verIDToLocation(
                                 par.outEdgeList[index])
                             # 随机写
-                            outer.AppendText("远程随机读数据和状态\n")
+                            outer.AppendText("远程随机读数状\n")
                             localRandomRW += 1
                             sleep(35000)
                             par.dataNextList[localIndex] = value
@@ -180,13 +178,13 @@ def start(graph: Graph, outer, epsilon, maxIter):
                                 localIndex = ligraPull.verIDToLocation(
                                     par.outEdgeList[index])
                                 # 远程调用的随机写
-                                outer.AppendText("本地顺序读数据和写数据/状态\n")
+                                outer.AppendText("本地顺序读数据\n")
+                                outer.AppendText("本地顺序写数状\n")
                                 remoteRandomRW += 6
                                 sleep(200000)
                                 par.dataNextList[localIndex] = value
                                 par.statNextList[localIndex] = True
         # VertexMap
-        outer.AppendText("一次循环的VertexMap\n")
         for par in ligraPull.partitionList:
             for master in par.masterList:
                 localIndex = ligraPull.verIDToLocation(master.id)
@@ -243,7 +241,6 @@ def proc(graph: Graph, outer, epsilon, maxIter, num):
             partition.statCurrList.append(True)
             partition.statNextList.append(True)
         ligraPull.stateLookUpTable[partition.id] = partition.statNextList
-    outer.AppendText("初始化结束\n")
     # 以上初始化结束
 
     # 开始进行计算
@@ -263,7 +260,6 @@ def proc(graph: Graph, outer, epsilon, maxIter, num):
     iter = 0
     while iter < maxIter and not ligraPull.isAllStateFalse():
         # EdgeMap
-        outer.AppendText("一次循环的EdgeMap\n")
         for par in ligraPull.partitionList:
             for master in par.masterList:
                 if master.outEdgeHeadIndex is not None:
@@ -277,7 +273,7 @@ def proc(graph: Graph, outer, epsilon, maxIter, num):
                             localIndex = ligraPull.verIDToLocation(
                                 par.outEdgeList[index])
                             # 随机写
-                            outer.AppendText("远程随机读数据和状态\n")
+                            outer.AppendText("远程随机读数状\n")
                             localRandomRW += 1
                             sleep(35000)
                             par.dataNextList[localIndex] = value
@@ -299,13 +295,13 @@ def proc(graph: Graph, outer, epsilon, maxIter, num):
                                 localIndex = ligraPull.verIDToLocation(
                                     par.outEdgeList[index])
                                 # 远程调用的随机写
-                                outer.AppendText("本地顺序读数据和写数据/状态\n")
+                                outer.AppendText("本地顺序读数据\n")
+                                outer.AppendText("本地顺序写数状\n")
                                 remoteRandomRW += 6
                                 sleep(200000)
                                 par.dataNextList[localIndex] = value
                                 par.statNextList[localIndex] = True
         # VertexMap
-        outer.AppendText("一次循环的VertexMap\n")
         for par in ligraPull.partitionList:
             for master in par.masterList:
                 localIndex = ligraPull.verIDToLocation(master.id)
