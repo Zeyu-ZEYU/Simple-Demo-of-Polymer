@@ -31,7 +31,7 @@ class _Agent:
         self.outEdgeIndexDelta: int
 
 
-class _PolymerPushPartition:
+class _LigraPushPartition:
     def __init__(self, id, graph: Graph,
                  parIDVertexListMap: Dict[int, List[int]]):
         self.id = id
@@ -54,15 +54,15 @@ class _PolymerPushPartition:
             self.locationMapping[self.masterList[index].id] = index
 
 
-class PolymerPush:
+class LigraPush:
     def __init__(self, graph: Graph, partitionNum):
-        self.partitionList: List[_PolymerPushPartition] = []
+        self.partitionList: List[_LigraPushPartition] = []
         parIDVertexListMap = graph.getParIDVertexListMap(partitionNum)
         for partitionID in range(partitionNum):
             self.partitionList.append(
-                _PolymerPushPartition(partitionID + 1, graph,
+                _LigraPushPartition(partitionID + 1, graph,
                                       parIDVertexListMap))
-        # 初始化_PolymerPushPartition中的self.agentList
+        # 初始化_LigraPushPartition中的self.agentList
         for partition in self.partitionList:
             for partition2 in self.partitionList:
                 if partition is not partition2:
@@ -70,7 +70,7 @@ class PolymerPush:
                         if partition.id in master.agentLocationList:
                             partition.agentList.append(
                                 _Agent(master.id, partition2.id))
-        # 初始化_PolymerPushPartition中的self.outEdgeList
+        # 初始化_LigraPushPartition中的self.outEdgeList
         for partition in self.partitionList:
             headIndex = 0
             for master in partition.masterList:
@@ -120,18 +120,19 @@ def sleep(num):
     for i in range(num):
         i = i + 1
 
+
 def start(graph: Graph, outer, epsilon, maxIter):
     epsilon = epsilon
     maxIter = maxIter
-    polymerPush = PolymerPush(graph, 2)
-    for partition in polymerPush.partitionList:
+    ligraPush = LigraPush(graph, 2)
+    for partition in ligraPush.partitionList:
         dCurr = 1 / graph.vertexNum
         for index in range(partition.masterIDList.__len__()):
             partition.dataCurrList.append(dCurr)
             partition.dataNextList.append(0.0)
             partition.statCurrList.append(True)
             partition.statNextList.append(True)
-        polymerPush.stateLookUpTable[partition.id] = partition.statNextList
+        ligraPush.stateLookUpTable[partition.id] = partition.statNextList
     outer.AppendText("初始化结束\n")
     # 以上初始化结束
 
@@ -141,83 +142,84 @@ def start(graph: Graph, outer, epsilon, maxIter):
     remoteRandomRW = 0
 
     iter = 0
-    while iter < maxIter and not polymerPush.isAllStateFalse():
+    while iter < maxIter and not ligraPush.isAllStateFalse():
         # EdgeMap
         outer.AppendText("一次循环的EdgeMap\n")
-        for par in polymerPush.partitionList:
+        for par in ligraPush.partitionList:
             for master in par.masterList:
                 if master.outEdgeHeadIndex is not None:
-                    localIndex = polymerPush.verIDToLocation(master.id)
+                    localIndex = ligraPush.verIDToLocation(master.id)
                     if par.statNextList[localIndex]:
                         value = par.dataCurrList[localIndex] / len(
                             graph.getTargetVertexList(master.id))
-                        for index in range(
-                                master.outEdgeHeadIndex,
-                                master.outEdgeHeadIndex + master.outEdgeIndexDelta):
-                            localIndex = polymerPush.verIDToLocation(
+                        for index in range(master.outEdgeHeadIndex,
+                                           master.outEdgeHeadIndex +
+                                           master.outEdgeIndexDelta):
+                            localIndex = ligraPush.verIDToLocation(
                                 par.outEdgeList[index])
                             # 随机写
-                            outer.AppendText("本地随机写数据和状态\n")
-                            localRandomRW += 2
-                            sleep(100000)
+                            outer.AppendText("本地顺序读数据和状态\n")
+                            localRandomRW += 1
+                            sleep(30000)
                             par.dataNextList[localIndex] = value
                             par.statNextList[localIndex] = True
                 # 更新master的agent所在各分区
                 for parID in master.agentLocationList:
-                    par = polymerPush.partitionList[parID - 1]
+                    par = ligraPush.partitionList[parID - 1]
                     agent = None
                     for ag in par.agentList:
                         if ag.id == master.id:
                             agent = ag
                             break
                     if agent.outEdgeHeadIndex is not None:
-                        localIndex = polymerPush.verIDToLocation(agent.id)
+                        localIndex = ligraPush.verIDToLocation(agent.id)
                         if par.statNextList[localIndex]:
-                            for index in range(
-                                    agent.outEdgeHeadIndex,
-                                    agent.outEdgeHeadIndex + agent.outEdgeIndexDelta):
-                                localIndex = polymerPush.verIDToLocation(
+                            for index in range(agent.outEdgeHeadIndex,
+                                               agent.outEdgeHeadIndex +
+                                               agent.outEdgeIndexDelta):
+                                localIndex = ligraPush.verIDToLocation(
                                     par.outEdgeList[index])
                                 # 远程调用的随机写
-                                outer.AppendText("远程顺序读数据和状态\n")
-                                remoteRandomRW += 2
+                                outer.AppendText("远程随机写数据和状态\n")
+                                remoteRandomRW += 5
                                 sleep(200000)
                                 par.dataNextList[localIndex] = value
                                 par.statNextList[localIndex] = True
         # VertexMap
         outer.AppendText("一次循环的VertexMap\n")
-        for par in polymerPush.partitionList:
+        for par in ligraPush.partitionList:
             for master in par.masterList:
-                localIndex = polymerPush.verIDToLocation(master.id)
+                localIndex = ligraPush.verIDToLocation(master.id)
                 if par.statNextList[localIndex]:
-                    outer.AppendText("本地随机写数据\n")
-                    localRandomRW += 2
-                    sleep(100000)
-                    par.dataNextList[localIndex] = 0.15 / graph.vertexNum + (0.85 * par.dataNextList[localIndex])
-                    isAlive = abs(par.dataNextList[localIndex] - par.dataCurrList[localIndex]) > epsilon
-                    par.dataCurrList[localIndex] = 0.0
-                    outer.AppendText("本地随机写状态\n")
+                    outer.AppendText("本地顺序读数据\n")
                     localRandomRW += 1
-                    sleep(50000)
+                    sleep(100000)
+                    par.dataNextList[localIndex] = 0.15 / graph.vertexNum + (
+                        0.85 * par.dataNextList[localIndex])
+                    isAlive = abs(par.dataNextList[localIndex] -
+                                  par.dataCurrList[localIndex]) > epsilon
+                    par.dataCurrList[localIndex] = 0.0
+                    outer.AppendText("本地顺序读状态\n")
+                    localRandomRW += 1
+                    sleep(1000000)
                     if isAlive:
                         par.statNextList[localIndex] = True
                     else:
                         par.statNextList[localIndex] = False
-        for par in polymerPush.partitionList:
+        for par in ligraPush.partitionList:
             temp = par.dataNextList
             par.dataNextList = par.dataCurrList
             par.dataCurrList = temp
         iter += 1
-    localRandomRW += 8
     endtime = datetime.datetime.now()
     outer.AppendText("===========================================\n")
     outer.AppendText("运行时间：" + str((endtime - starttime)) + "\n")
-    outer.AppendText("本地随机读或写次数：" + str(localRandomRW) + "\n")
-    outer.AppendText("远程随机读或写次数：" + str(0) + "\n")
+    outer.AppendText("本地随机读或写次数：" + str(0) + "\n")
+    outer.AppendText("远程随机读或写次数：" + str(remoteRandomRW) + "\n")
     outer.AppendText("===========================================\n")
     outer.AppendText("备注：\n")
-    outer.AppendText("Polymer Push涉及“本地随机写”。无远程随机读/写。\n")
-    outer.AppendText("但有远程顺序读。\n")
+    outer.AppendText("Ligra Push涉及“远程随机写”。无本地随机读/写。\n")
+    outer.AppendText("但有本地顺序读。\n")
     outer.AppendText("===========================================\n")
 
 
@@ -230,15 +232,15 @@ e = None
 def proc(graph: Graph, outer, epsilon, maxIter, num):
     epsilon = epsilon
     maxIter = maxIter
-    polymerPush = PolymerPush(graph, 2)
-    for partition in polymerPush.partitionList:
+    ligraPush = LigraPush(graph, 2)
+    for partition in ligraPush.partitionList:
         dCurr = 1 / graph.vertexNum
         for index in range(partition.masterIDList.__len__()):
             partition.dataCurrList.append(dCurr)
             partition.dataNextList.append(0.0)
             partition.statCurrList.append(True)
             partition.statNextList.append(True)
-        polymerPush.stateLookUpTable[partition.id] = partition.statNextList
+        ligraPush.stateLookUpTable[partition.id] = partition.statNextList
     outer.AppendText("初始化结束\n")
     # 以上初始化结束
 
@@ -253,80 +255,76 @@ def proc(graph: Graph, outer, epsilon, maxIter, num):
     e = None
 
     s = datetime.datetime.now()
-    localRandomRW = 0
-    remoteRandomRW = 0
-
     iter = 0
-    while iter < maxIter and not polymerPush.isAllStateFalse():
+    while iter < maxIter and not ligraPush.isAllStateFalse():
         # EdgeMap
         outer.AppendText("一次循环的EdgeMap\n")
-        for par in polymerPush.partitionList:
+        for par in ligraPush.partitionList:
             for master in par.masterList:
                 if master.outEdgeHeadIndex is not None:
-                    localIndex = polymerPush.verIDToLocation(master.id)
+                    localIndex = ligraPush.verIDToLocation(master.id)
                     if par.statNextList[localIndex]:
                         value = par.dataCurrList[localIndex] / len(
                             graph.getTargetVertexList(master.id))
                         for index in range(master.outEdgeHeadIndex,
                                            master.outEdgeHeadIndex +
                                            master.outEdgeIndexDelta):
-                            localIndex = polymerPush.verIDToLocation(
+                            localIndex = ligraPush.verIDToLocation(
                                 par.outEdgeList[index])
                             # 随机写
-                            outer.AppendText("本地随机写数据和状态\n")
-                            localRandomRW += 2
-                            sleep(100000)
+                            outer.AppendText("本地顺序读数据和状态\n")
+                            localRandomRW += 1
+                            sleep(30000)
                             par.dataNextList[localIndex] = value
                             par.statNextList[localIndex] = True
                 # 更新master的agent所在各分区
                 for parID in master.agentLocationList:
-                    par = polymerPush.partitionList[parID - 1]
+                    par = ligraPush.partitionList[parID - 1]
                     agent = None
                     for ag in par.agentList:
                         if ag.id == master.id:
                             agent = ag
                             break
                     if agent.outEdgeHeadIndex is not None:
-                        localIndex = polymerPush.verIDToLocation(agent.id)
+                        localIndex = ligraPush.verIDToLocation(agent.id)
                         if par.statNextList[localIndex]:
                             for index in range(agent.outEdgeHeadIndex,
                                                agent.outEdgeHeadIndex +
                                                agent.outEdgeIndexDelta):
-                                localIndex = polymerPush.verIDToLocation(
+                                localIndex = ligraPush.verIDToLocation(
                                     par.outEdgeList[index])
                                 # 远程调用的随机写
-                                outer.AppendText("远程顺序读数据和状态\n")
-                                remoteRandomRW += 2
+                                outer.AppendText("远程随机写数据和状态\n")
+                                remoteRandomRW += 5
                                 sleep(200000)
                                 par.dataNextList[localIndex] = value
                                 par.statNextList[localIndex] = True
         # VertexMap
         outer.AppendText("一次循环的VertexMap\n")
-        for par in polymerPush.partitionList:
+        for par in ligraPush.partitionList:
             for master in par.masterList:
-                localIndex = polymerPush.verIDToLocation(master.id)
+                localIndex = ligraPush.verIDToLocation(master.id)
                 if par.statNextList[localIndex]:
-                    outer.AppendText("本地随机写数据\n")
-                    localRandomRW += 2
+                    outer.AppendText("本地顺序读数据\n")
+                    localRandomRW += 1
                     sleep(100000)
                     par.dataNextList[localIndex] = 0.15 / graph.vertexNum + (
                         0.85 * par.dataNextList[localIndex])
                     isAlive = abs(par.dataNextList[localIndex] -
                                   par.dataCurrList[localIndex]) > epsilon
                     par.dataCurrList[localIndex] = 0.0
-                    outer.AppendText("本地随机写状态\n")
+                    outer.AppendText("本地顺序读状态\n")
                     localRandomRW += 1
-                    sleep(50000)
+                    sleep(1000000)
                     if isAlive:
                         par.statNextList[localIndex] = True
                     else:
                         par.statNextList[localIndex] = False
-        for par in polymerPush.partitionList:
+        for par in ligraPush.partitionList:
             temp = par.dataNextList
             par.dataNextList = par.dataCurrList
             par.dataCurrList = temp
         iter += 1
-    localRandomRW += 8
     e = datetime.datetime.now()
 
 
@@ -339,48 +337,11 @@ def startProc(graph: Graph, outer, epsilon, maxIter, num):
     global e
     outer.AppendText("===========================================\n")
     outer.AppendText("运行时间：" + str((e - s) * (num / 6) * 0.631) + "\n")
-    outer.AppendText(
-        "本地随机读或写次数：" + str(int(localRandomRW * (num / 6) * 0.631)) + "\n")
-    outer.AppendText("远程随机读或写次数：" + str(0) + "\n")
+    outer.AppendText("本地随机读或写次数：" + str(0) + "\n")
+    outer.AppendText("远程随机读或写次数：" + str(int(remoteRandomRW *
+                                        (num / 6) * 0.631)) + "\n")
     outer.AppendText("===========================================\n")
     outer.AppendText("备注：\n")
-    outer.AppendText("Polymer Push涉及“本地随机写”。无远程随机读/写。\n")
-    outer.AppendText("但有远程顺序读。\n")
+    outer.AppendText("Ligra Push涉及“远程随机写”。无本地随机读/写。\n")
+    outer.AppendText("但有本地顺序读。\n")
     outer.AppendText("===========================================\n")
-
-
-    # def pageRankProcess(epsilon, maxIter, sourceVertexID, parInfoList):
-    #     iter = 0
-    #     while iter <= maxIter and not polymerPush.isAllStateFalse():
-    #         for parInfo in parInfoList:
-
-    # parLength = polymerPush.partitionList[0].masterList.__len__()
-    # for vertexID in graph.vertexList:
-    #     partitionID = int(vertexID / parLength) + 1
-    #     parInfoList: List[Tuple(_PolymerPushPartition, bool, int, int)] = []
-    #     par = polymerPush.partitionList[partitionID - 1]
-    #     localIndex = polymerPush.verIDToLocation(vertexID)
-    #     master = par.masterList[localIndex]
-    #     parInfoList.append((par, True, master.outEdgeHeadIndex, master.outEdgeIndexDelta))
-    #     for agentParID in master.agentLocationList:
-    #         agentPar = polymerPush.partitionList[agentParID - 1]
-    #         for agent in agentPar.agentList:
-    #             if agent.id == vertexID:
-    #                 parInfoList.append((agentPar, False, agent.outEdgeHeadIndex, agent.outEdgeIndexDelta))
-    #                 break
-
-    # # def funcPREdgeF(polymerPush: PolymerPush, partition: _PolymerPushPartition, s: int, t: int) -> bool:
-    # #     partitionID, localIndex = polymerPush.verIDToLocation(t)
-    # #     partition.dataNextList[localIndex] =
-    # #     return True
-
-    # # def pageRank(graph: Graph, epsilon, maxIter):
-    # #     polymerPush = PolymerPush(graph, 2)
-    # #     for partition in polymerPush.partitionList:
-    # #         dCurr = 1 / graph.vertexNum
-    # #         for index in range(partition.masterIDList.__len__()):
-    # #             partition.dataCurrList.append(dCurr)
-    # #             partition.dataNextList.append(0.0)
-    # #             partition.statCurrList.append(Ture)
-
-    # #     iter = 0

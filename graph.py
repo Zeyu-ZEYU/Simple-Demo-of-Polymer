@@ -43,3 +43,8 @@ class Graph:
             newList.append(self.vertexList[index])
         parIDVertexListMap[partitionNum] = newList
         return parIDVertexListMap
+
+    def getOutEdgeNum(self, vertexID):
+        for ele in self.graphInfoList:
+            if ele[0] == vertexID:
+                return ele.__len__() - 1
