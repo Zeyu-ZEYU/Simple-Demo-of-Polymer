@@ -2,7 +2,7 @@ from graph import Graph
 
 import polymer_push, ligra_push, polymer_pull, ligra_pull
 import random
-import time
+import time, threading
 import wx
 
 
